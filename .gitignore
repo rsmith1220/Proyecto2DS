@@ -1,0 +1,4 @@
+#excluimos los folders con los datos desagrupados
+data/
+
+csvComplet/
