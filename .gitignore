@@ -1,6 +1,7 @@
 #excluimos los folders con los datos desagrupados
 data/
-
+mediadata/
 csvComplet/
+combined_playlists.csv
 
 .env

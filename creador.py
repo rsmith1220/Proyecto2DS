@@ -1,75 +1,79 @@
-import json
 import csv
 import os
+import json
 
-def json_to_csv_playlists(json_file_path, csv_file_path):
-    # Load the JSON data
-    with open(json_file_path, 'r') as file:
-        data = json.load(file)
+# File paths of the provided JSON files
+# Directory containing the JSON files
+data_directory = 'data'  # Replace with the path to your data directory
 
-    # Extract the playlists data
-    playlists = data['playlists']
+# List all JSON files in the data directory
+json_files = [os.path.join(data_directory, f) for f in os.listdir(data_directory) if f.endswith('.json')]
 
-    # Define the fields we want in the CSV
-    csv_headers = [
-        'pid', 'name', 'description', 'num_tracks', 'num_albums', 
-        'num_followers', 'collaborative', 'modified_at', 'num_edits', 
-        'duration_ms', 'num_artists'
-    ]
-
-    # Define default values for potential missing keys
-    default_values = {
-        'description': '',
-        'pid': '',
-        'name': '',
-        'num_tracks': 0,
-        'num_albums': 0,
-        'num_followers': 0,
-        'collaborative': False,
-        'modified_at': 0,
-        'num_edits': 0,
-        'duration_ms': 0,
-        'num_artists': 0
+def flatten_playlist(playlist, max_tracks):
+    # Basic playlist information
+    flattened = {
+        'pid': playlist['pid'],
+        'name': playlist.get('name', ''),
+        'collaborative': playlist.get('collaborative', ''),
+        'duration_ms': playlist.get('duration_ms', ''),
+        'num_albums': playlist.get('num_albums', ''),
+        'num_artists': playlist.get('num_artists', ''),
+        'num_edits': playlist.get('num_edits', ''),
+        'num_followers': playlist.get('num_followers', ''),
+        'num_tracks': playlist.get('num_tracks', ''),
+        'modified_at': playlist.get('modified_at', '')
     }
 
-    # Write to the CSV file using the defined headers
-    with open(csv_file_path, 'w', newline='', encoding='utf-8') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=csv_headers)
-        writer.writeheader()
-        for playlist in playlists:
-            # Set default values for missing keys
-            for key, default_value in default_values.items():
-                playlist.setdefault(key, default_value)
-            # Extract only the desired fields for each playlist
-            playlist = {key: playlist[key] for key in csv_headers}
-            writer.writerow(playlist)
+    # Flatten tracks
+    for i, track in enumerate(playlist['tracks']):
+        flattened[f'track{i+1}_name'] = track.get('track_name', '')
+        flattened[f'track{i+1}_album_name'] = track.get('album_name', '')
+        flattened[f'track{i+1}_artist_name'] = track.get('artist_name', '')
+        flattened[f'track{i+1}_album_uri'] = track.get('album_uri', '')
+        flattened[f'track{i+1}_artist_uri'] = track.get('artist_uri', '')
+        flattened[f'track{i+1}_track_uri'] = track.get('track_uri', '')
+        flattened[f'track{i+1}_duration_ms'] = track.get('duration_ms', '')
+        flattened[f'track{i+1}_pos'] = track.get('pos', '')
 
-    print(f"CSV file saved to: {csv_file_path}")
+    # Fill in empty values for playlists with fewer tracks
+    for i in range(len(playlist['tracks']), max_tracks):
+        flattened[f'track{i+1}_name'] = ''
+        flattened[f'track{i+1}_album_name'] = ''
+        flattened[f'track{i+1}_artist_name'] = ''
+        flattened[f'track{i+1}_album_uri'] = ''
+        flattened[f'track{i+1}_artist_uri'] = ''
+        flattened[f'track{i+1}_track_uri'] = ''
+        flattened[f'track{i+1}_duration_ms'] = ''
+        flattened[f'track{i+1}_pos'] = ''
 
-def process_directory(directory_path, output_directory=None):
-    # If no output directory is specified, use the input directory
-    if output_directory is None:
-        output_directory = directory_path
+    return flattened
 
-    # Ensure output directory exists
-    if not os.path.exists(output_directory):
-        os.makedirs(output_directory)
+def find_max_tracks_in_files(files):
+    max_tracks = 0
+    for file_path in files:
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+        max_tracks = max(max_tracks, max(len(playlist['tracks']) for playlist in data['playlists']))
+    return max_tracks
 
-    # Loop through all files in the directory
-    for filename in os.listdir(directory_path):
-        if filename.endswith(".json"):
-            json_file_path = os.path.join(directory_path, filename)
-            csv_filename = filename.replace(".json", ".csv")
-            csv_file_path = os.path.join(output_directory, csv_filename)
-            json_to_csv_playlists(json_file_path, csv_file_path)
+# Find the maximum number of tracks in any playlist across all files
+max_tracks = find_max_tracks_in_files(json_files)
 
-# Example usage
-input_directory = "data"
-output_directory = "csvComplet"  # Can be the same as input_directory
-process_directory(input_directory, output_directory)
+# Path for the combined CSV file
+combined_csv_path = 'combined_playlists.csv'
 
+# Process each file and write to the CSV
+with open(combined_csv_path, mode='w', newline='', encoding='utf-8') as csv_file:
+    writer = None
+    for json_file in json_files:
+        with open(json_file, 'r') as file:
+            data = json.load(file)
+        for playlist in data['playlists']:
+            flattened_playlist = flatten_playlist(playlist, max_tracks)
+            if writer is None:
+                # Initialize CSV writer and write headers
+                writer = csv.DictWriter(csv_file, fieldnames=flattened_playlist.keys())
+                writer.writeheader()
+            writer.writerow(flattened_playlist)
 
-
-
-
-
+combined_csv_path
